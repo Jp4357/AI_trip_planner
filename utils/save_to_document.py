@@ -4,13 +4,15 @@ import datetime
 
 def save_document(response_text: str, directory: str = "./output"):
     """Export travel plan to Markdown file with proper formatting"""
+    directory = os.path.abspath("./output")
     os.makedirs(directory, exist_ok=True)
+    # os.makedirs(directory, exist_ok=True)
 
     # Create markdown content with metadata header
     markdown_content = f"""# 🌍 AI Travel Plan
 
     # **Generated:** {datetime.datetime.now().strftime('%Y-%m-%d at %H:%M')}  
-    # **Created by:** Atriyo's Travel Agent
+    # **Created by:** Jp's Travel Agent
 
     ---
 
