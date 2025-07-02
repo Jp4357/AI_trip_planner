@@ -6,6 +6,7 @@ from tools.weather_info_tool import WeatherInfoTool
 from tools.place_search_tool import PlaceSearchTool
 from tools.expense_calculator_tool import CalculatorTool
 from tools.currency_conversion_tool import CurrencyConverterTool
+from tools.send_email_tool import SendEmailTool
 
 
 class GraphBuilder:
@@ -19,6 +20,7 @@ class GraphBuilder:
         self.place_search_tools = PlaceSearchTool()
         self.calculator_tools = CalculatorTool()
         self.currency_converter_tools = CurrencyConverterTool()
+        self.email_tools = SendEmailTool()
 
         self.tools.extend(
             [
@@ -26,6 +28,7 @@ class GraphBuilder:
                 *self.place_search_tools.place_search_tool_list,
                 *self.calculator_tools.calculator_tool_list,
                 *self.currency_converter_tools.currency_converter_tool_list,
+                *self.email_tools.send_email_tool_list,
             ]
         )
 
