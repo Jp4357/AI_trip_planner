@@ -1,7 +1,8 @@
 // src/services/api/travel/travelApi.ts
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { ApiConstants } from "../../../utils/constants/api_constants";
 
-// Types for Travel API
+// Inline types for now - you can move these to a separate types file
 export interface TravelQuery {
     question: string;
 }
@@ -10,11 +11,11 @@ export interface TravelResponse {
     answer: string;
 }
 
-// Travel API definition
+// Travel API definition with basic validation
 export const travelApi = createApi({
     reducerPath: "travelApi",
     baseQuery: fetchBaseQuery({
-        baseUrl: "https://074c-152-52-60-98.ngrok-free.app",
+        baseUrl: ApiConstants.TRAVEL_API_BASE_URL,
         prepareHeaders: (headers) => {
             // Add ngrok bypass header to avoid browser warning
             headers.set('ngrok-skip-browser-warning', 'true');
@@ -25,15 +26,41 @@ export const travelApi = createApi({
     tagTypes: ['TravelPlan'],
     endpoints: (builder) => ({
         getTravelPlan: builder.mutation<TravelResponse, TravelQuery>({
-            query: (travelQuery) => ({
-                url: "/query",
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "ngrok-skip-browser-warning": "true"
-                },
-                body: travelQuery,
-            }),
+            query: (travelQuery) => {
+                // Basic validation - ensure question is not empty
+                if (!travelQuery.question || travelQuery.question.trim().length === 0) {
+                    throw new Error('Travel question cannot be empty');
+                }
+
+                if (travelQuery.question.trim().length < 10) {
+                    throw new Error('Please provide more details about your travel plans (at least 10 characters)');
+                }
+
+                return {
+                    url: ApiConstants.TRAVEL_QUERY_ENDPOINT,
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "ngrok-skip-browser-warning": "true"
+                    },
+                    body: travelQuery,
+                };
+            },
+            transformResponse: (response: any): TravelResponse => {
+                // Basic response validation
+                if (!response || typeof response.answer !== 'string') {
+                    throw new Error('Invalid response from server');
+                }
+                return response;
+            },
+            transformErrorResponse: (response: any) => {
+                console.error('Travel API Error:', response);
+
+                return {
+                    status: response.status || 'UNKNOWN_ERROR',
+                    data: response.data || 'An unexpected error occurred'
+                };
+            },
             invalidatesTags: ['TravelPlan'],
         }),
     }),
