@@ -2,10 +2,12 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { setupListeners } from "@reduxjs/toolkit/query";
 import { travelApi } from "../../services/api/travel/travelApi";
+import themeReducer from "../../features/theme/themeSlice";
 
 export const store = configureStore({
     reducer: {
         [travelApi.reducerPath]: travelApi.reducer, // Add travel API reducer
+        theme: themeReducer, // Add theme reducer
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware().concat(

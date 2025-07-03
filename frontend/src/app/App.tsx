@@ -1,12 +1,29 @@
 // src/app/App.tsx
+import { useEffect } from 'react';
 import { Route, Routes } from 'react-router';
 import TravelPlannerHome from '../pages/travel/TravelPlannerHome';
-import { useTheme } from '../hooks/useTheme';
 import '../styles/App.css';
+import { useAppDispatch, useAppSelector } from './store/hooks';
+import { initializeTheme, selectIsDark } from '../features/theme/themeSlice';
 
 function App() {
-  // Initialize theme system (this will handle the DOM classes)
-  useTheme();
+  const dispatch = useAppDispatch();
+  const isDark = useAppSelector(selectIsDark);
+
+  // Initialize theme from localStorage and system preference
+  useEffect(() => {
+    dispatch(initializeTheme());
+  }, [dispatch]);
+
+  // Apply the 'dark' class to the <html> element
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDark) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [isDark]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-200">

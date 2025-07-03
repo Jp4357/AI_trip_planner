@@ -1,14 +1,20 @@
 // src/components/ui/ThemeToggle.tsx
 import React from 'react';
 import { Sun, Moon } from 'lucide-react';
-import { useTheme } from '../../hooks/useTheme';
+import { useAppDispatch, useAppSelector } from '../../app/store/hooks';
+import { selectIsDark, toggleTheme } from '../../features/theme/themeSlice';
 
 interface ThemeToggleProps {
     size?: 'sm' | 'md' | 'lg';
 }
 
 const ThemeToggle: React.FC<ThemeToggleProps> = ({ size = 'md' }) => {
-    const { isDark, toggleTheme } = useTheme();
+    const dispatch = useAppDispatch();
+    const isDark = useAppSelector(selectIsDark);
+
+    const handleToggle = () => {
+        dispatch(toggleTheme());
+    };
 
     const sizeClasses = {
         sm: 'w-8 h-8',
@@ -24,7 +30,7 @@ const ThemeToggle: React.FC<ThemeToggleProps> = ({ size = 'md' }) => {
 
     return (
         <button
-            onClick={toggleTheme}
+            onClick={handleToggle}
             className={`
         ${sizeClasses[size]} 
         flex items-center justify-center

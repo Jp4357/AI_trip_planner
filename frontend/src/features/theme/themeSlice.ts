@@ -97,7 +97,7 @@ const themeSlice = createSlice({
             const newMode: ThemeMode = state.isDark ? 'light' : 'dark';
 
             state.mode = newMode;
-            state.isDark = newMode === 'dark';
+            state.isDark = !state.isDark; // Correctly toggle the isDark state
 
             // Save to localStorage
             if (typeof window !== 'undefined') {

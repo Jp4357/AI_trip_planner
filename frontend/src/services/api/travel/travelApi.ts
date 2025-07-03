@@ -27,15 +27,6 @@ export const travelApi = createApi({
     endpoints: (builder) => ({
         getTravelPlan: builder.mutation<TravelResponse, TravelQuery>({
             query: (travelQuery) => {
-                // Basic validation - ensure question is not empty
-                if (!travelQuery.question || travelQuery.question.trim().length === 0) {
-                    throw new Error('Travel question cannot be empty');
-                }
-
-                if (travelQuery.question.trim().length < 10) {
-                    throw new Error('Please provide more details about your travel plans (at least 10 characters)');
-                }
-
                 return {
                     url: ApiConstants.TRAVEL_QUERY_ENDPOINT,
                     method: "POST",
@@ -43,7 +34,10 @@ export const travelApi = createApi({
                         "Content-Type": "application/json",
                         "ngrok-skip-browser-warning": "true"
                     },
-                    body: travelQuery,
+                    body: JSON.stringify({
+                        ...travelQuery,
+                        question: travelQuery.question + " Don't use *,#@,%,^,&,() characters in the response. make headings bold and use bullet points for lists."
+                    }),
                 };
             },
             transformResponse: (response: any): TravelResponse => {

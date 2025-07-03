@@ -1,10 +1,11 @@
 // src/pages/travel/TravelPlannerHome.tsx
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Send, MapPin, Calendar, DollarSign, Hotel, Utensils, Camera, ArrowRight, AlertCircle } from 'lucide-react';
 import { useGetTravelPlanMutation } from '../../services/api/travel/travelApi';
 import { EXAMPLE_TRAVEL_QUESTIONS } from '../../utils/constants/app_constants';
 import TravelPlanDisplay from './TravelPlanDisplay';
 import ThemeToggle from '../../components/ui/ThemeToggle';
+import { travelQuerySchema } from '../../utils/validation/schema';
 
 interface ValidationError {
     field: string;
@@ -14,72 +15,27 @@ interface ValidationError {
 const TravelPlannerHome: React.FC = () => {
     const [question, setQuestion] = useState('');
     const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
-    const [getTravelPlan, { data, error, isLoading }] = useGetTravelPlanMutation();
-
-    const validateForm = useCallback((questionText: string): ValidationError[] => {
-        const errors: ValidationError[] = [];
-
-        if (!questionText || questionText.trim().length === 0) {
-            errors.push({
-                field: 'question',
-                message: 'Please enter your travel question'
-            });
-            return errors;
-        }
-
-        if (questionText.trim().length < 10) {
-            errors.push({
-                field: 'question',
-                message: 'Please provide more details about your travel plans (at least 10 characters)'
-            });
-        }
-
-        if (questionText.trim().length > 500) {
-            errors.push({
-                field: 'question',
-                message: 'Please keep your question under 500 characters'
-            });
-        }
-
-        // Check for travel-related keywords
-        const lowerQuestion = questionText.toLowerCase();
-        const travelKeywords = ['trip', 'travel', 'vacation', 'plan', 'visit', 'tour', 'holiday', 'journey'];
-        const hasKeyword = travelKeywords.some(keyword => lowerQuestion.includes(keyword));
-
-        if (!hasKeyword) {
-            errors.push({
-                field: 'question',
-                message: 'Please include travel-related keywords in your question (e.g., trip, travel, vacation, plan)'
-            });
-        }
-
-        return errors;
-    }, []);
+    const [getTravelPlan, { data, error, isLoading, reset }] = useGetTravelPlanMutation();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-
-        // Clear previous validation errors
         setValidationErrors([]);
 
-        if (!question.trim()) {
-            setValidationErrors([{ field: 'question', message: 'Please enter your travel question' }]);
-            return;
-        }
+        const validationResult = travelQuerySchema.safeParse({ question: question.trim() });
 
-        // Validate the form
-        const errors = validateForm(question.trim());
-        if (errors.length > 0) {
-            setValidationErrors(errors);
+        if (!validationResult.success) {
+            const formattedErrors = validationResult.error.errors.map((err) => ({
+                field: err.path[0].toString(),
+                message: err.message,
+            }));
+            setValidationErrors(formattedErrors);
             return;
         }
 
         try {
-            await getTravelPlan({ question: question.trim() }).unwrap();
+            await getTravelPlan({ question: validationResult.data.question }).unwrap();
         } catch (err: any) {
             console.error('Error getting travel plan:', err);
-
-            // Handle validation errors from API
             if (err.status === 'VALIDATION_ERROR') {
                 setValidationErrors([{ field: 'question', message: err.data }]);
             }
@@ -104,8 +60,8 @@ const TravelPlannerHome: React.FC = () => {
     const handleReset = () => {
         setQuestion('');
         setValidationErrors([]);
-        // Reset the data by reloading - in a real app, you'd want to reset the RTK Query state
-        window.location.reload();
+        // Reset the data by calling the reset function from the hook
+        reset();
     };
 
     const hasValidationErrors = validationErrors.length > 0;
