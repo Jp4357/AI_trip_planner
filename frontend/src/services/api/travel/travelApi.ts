@@ -1,17 +1,9 @@
 // src/services/api/travel/travelApi.ts
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { createApi, fetchBaseQuery, type FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
 import { ApiConstants } from "../../../utils/constants/api_constants";
+import { travelResponseSchema, type TravelQuery, type TravelResponse } from "../../../utils/validation/schema";
 
-// Inline types for now - you can move these to a separate types file
-export interface TravelQuery {
-    question: string;
-}
-
-export interface TravelResponse {
-    answer: string;
-}
-
-// Travel API definition with basic validation
+// Travel API definition with Zod validation
 export const travelApi = createApi({
     reducerPath: "travelApi",
     baseQuery: fetchBaseQuery({
@@ -40,19 +32,30 @@ export const travelApi = createApi({
                     }),
                 };
             },
-            transformResponse: (response: any): TravelResponse => {
-                // Basic response validation
-                if (!response || typeof response.answer !== 'string') {
-                    throw new Error('Invalid response from server');
+            transformResponse: (response: TravelResponse): TravelResponse => {
+                // Validate the response with Zod
+                const validation = travelResponseSchema.safeParse(response);
+                if (!validation.success) {
+                    console.error("API Response Validation Error:", validation.error.flatten());
+                    throw new Error('Invalid response structure from server');
                 }
-                return response;
+                return validation.data;
             },
-            transformErrorResponse: (response: any) => {
+            transformErrorResponse: (response: FetchBaseQueryError) => { // Use FetchBaseQueryError type
                 console.error('Travel API Error:', response);
 
+                // Access status and data based on FetchBaseQueryError structure
+                const status = 'status' in response ? response.status : 'UNKNOWN_STATUS';
+                const data = 'data' in response ? response.data : 'An unexpected error occurred';
+
+                const errorMessage = typeof data === 'string'
+                    ? data
+                    : 'An unexpected error occurred';
+
+
                 return {
-                    status: response.status || 'UNKNOWN_ERROR',
-                    data: response.data || 'An unexpected error occurred'
+                    status: status,
+                    data: errorMessage
                 };
             },
             invalidatesTags: ['TravelPlan'],

@@ -1,6 +1,6 @@
 // src/pages/travel/TravelPlannerHome.tsx
 import React, { useState } from 'react';
-import { Send, MapPin, Calendar, DollarSign, Hotel, Utensils, Camera, ArrowRight, AlertCircle } from 'lucide-react';
+import { Send, MapPin, Calendar, DollarSign, Hotel, Utensils, ArrowRight, AlertCircle, Mail } from 'lucide-react';
 import { useGetTravelPlanMutation } from '../../services/api/travel/travelApi';
 import { EXAMPLE_TRAVEL_QUESTIONS } from '../../utils/constants/app_constants';
 import TravelPlanDisplay from './TravelPlanDisplay';
@@ -12,8 +12,14 @@ interface ValidationError {
     message: string;
 }
 
+interface ApiError {
+    status: string | number;
+    data: string;
+}
+
 const TravelPlannerHome: React.FC = () => {
     const [question, setQuestion] = useState('');
+    const [sendAsEmail, setSendAsEmail] = useState(false);
     const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
     const [getTravelPlan, { data, error, isLoading, reset }] = useGetTravelPlanMutation();
 
@@ -33,11 +39,21 @@ const TravelPlannerHome: React.FC = () => {
         }
 
         try {
-            await getTravelPlan({ question: validationResult.data.question }).unwrap();
-        } catch (err: any) {
+            // Include email flag in API call - modify this when your API supports it
+            await getTravelPlan({
+                question: validationResult.data.question,
+                // sendAsEmail: sendAsEmail  // Uncomment when API supports this
+            }).unwrap();
+
+            // For now, you can log the email preference
+            if (sendAsEmail) {
+                console.log('📧 Email delivery requested for travel plan');
+            }
+        } catch (err) {
             console.error('Error getting travel plan:', err);
-            if (err.status === 'VALIDATION_ERROR') {
-                setValidationErrors([{ field: 'question', message: err.data }]);
+            const apiError = err as ApiError;
+            if (apiError.status === 'VALIDATION_ERROR') {
+                setValidationErrors([{ field: 'question', message: apiError.data }]);
             }
         }
     };
@@ -57,8 +73,13 @@ const TravelPlannerHome: React.FC = () => {
         }
     };
 
+    const handleEmailToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setSendAsEmail(e.target.checked);
+    };
+
     const handleReset = () => {
         setQuestion('');
+        setSendAsEmail(false);
         setValidationErrors([]);
         // Reset the data by calling the reset function from the hook
         reset();
@@ -77,7 +98,7 @@ const TravelPlannerHome: React.FC = () => {
                             <div className="w-10 h-10 bg-indigo-600 dark:bg-indigo-500 rounded-lg flex items-center justify-center transition-colors duration-200">
                                 <MapPin className="w-6 h-6 text-white" />
                             </div>
-                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white transition-colors duration-200">AI Trip Planner</h1>
+                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white transition-colors duration-200">EasyItinerary</h1>
                         </div>
 
                         {/* Theme Toggle */}
@@ -171,6 +192,33 @@ const TravelPlannerHome: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
+
+                                {/* Email Checkbox Option */}
+                                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600 transition-colors duration-200">
+                                    <div className="flex items-center space-x-3">
+                                        <input
+                                            id="send-as-email"
+                                            type="checkbox"
+                                            checked={sendAsEmail}
+                                            onChange={handleEmailToggle}
+                                            disabled={isLoading}
+                                            className="w-5 h-5 text-indigo-600 bg-white dark:bg-gray-600 border-gray-300 dark:border-gray-500 rounded focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:ring-2 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        />
+                                        <label
+                                            htmlFor="send-as-email"
+                                            className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer transition-colors duration-200"
+                                        >
+                                            <Mail className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                                            <span>Send travel plan to my email</span>
+                                        </label>
+                                    </div>
+                                    {sendAsEmail && (
+                                        <div className="flex items-center space-x-2 text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1 rounded-full">
+                                            <div className="w-2 h-2 bg-indigo-600 dark:bg-indigo-400 rounded-full animate-pulse"></div>
+                                            <span>Email enabled</span>
+                                        </div>
+                                    )}
+                                </div>
                             </form>
 
                             {/* Example Questions */}
@@ -197,7 +245,15 @@ const TravelPlannerHome: React.FC = () => {
                             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-12 text-center border border-gray-100 dark:border-gray-700 transition-colors duration-200">
                                 <div className="w-16 h-16 border-4 border-indigo-600 dark:border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2 transition-colors duration-200">Creating Your Perfect Trip</h3>
-                                <p className="text-gray-600 dark:text-gray-300 transition-colors duration-200">Our AI is analyzing destinations, costs, and creating your personalized itinerary...</p>
+                                <p className="text-gray-600 dark:text-gray-300 transition-colors duration-200">
+                                    Our AI is analyzing destinations, costs, and creating your personalized itinerary...
+                                    {sendAsEmail && (
+                                        <span className="block mt-2 text-sm text-indigo-600 dark:text-indigo-400 flex items-center justify-center space-x-1">
+                                            <Mail className="w-4 h-4" />
+                                            <span>Will also send to your email when ready</span>
+                                        </span>
+                                    )}
+                                </p>
                             </div>
                         )}
 
@@ -209,8 +265,8 @@ const TravelPlannerHome: React.FC = () => {
                                 </div>
                                 <h3 className="text-lg font-semibold text-red-900 dark:text-red-300 mb-2 transition-colors duration-200">Something went wrong</h3>
                                 <p className="text-red-700 dark:text-red-400 transition-colors duration-200">
-                                    {typeof error === 'object' && 'data' in error
-                                        ? String(error.data)
+                                    {error && typeof error === 'object' && 'data' in error
+                                        ? String((error as ApiError).data)
                                         : 'We couldn\'t generate your travel plan. Please try again.'
                                     }
                                 </p>

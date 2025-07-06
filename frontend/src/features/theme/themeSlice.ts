@@ -1,6 +1,7 @@
 // src/features/theme/themeSlice.ts
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
+import type { RootState } from '../../app/store/store';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -127,7 +128,7 @@ export const { initializeTheme, setThemeMode, toggleTheme, setSystemPreference }
 export default themeSlice.reducer;
 
 // Selectors
-export const selectThemeMode = (state: { theme: ThemeState }) => state.theme.mode;
-export const selectIsDark = (state: { theme: ThemeState }) => state.theme.isDark;
-export const selectSystemPreference = (state: { theme: ThemeState }) => state.theme.systemPreference;
-export const selectIsInitialized = (state: { theme: ThemeState }) => state.theme.isInitialized;
+export const selectThemeMode = (state: RootState) => state.theme.mode;
+export const selectIsDark = (state: RootState) => state.theme.isDark;
+export const selectSystemPreference = (state: RootState) => state.theme.systemPreference;
+export const selectIsInitialized = (state: RootState) => state.theme.isInitialized;

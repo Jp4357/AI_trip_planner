@@ -1,16 +1,33 @@
 -- ./src/app/App.tsx --
 // src/app/App.tsx
+import { useEffect } from 'react';
 import { Route, Routes } from 'react-router';
 import TravelPlannerHome from '../pages/travel/TravelPlannerHome';
-import { useTheme } from '../hooks/useTheme';
 import '../styles/App.css';
+import { useAppDispatch, useAppSelector } from './store/hooks';
+import { initializeTheme, selectIsDark } from '../features/theme/themeSlice';
 
 function App() {
-  // Initialize theme system
-  useTheme();
+  const dispatch = useAppDispatch();
+  const isDark = useAppSelector(selectIsDark);
+
+  // Initialize theme from localStorage and system preference
+  useEffect(() => {
+    dispatch(initializeTheme());
+  }, [dispatch]);
+
+  // Apply the 'dark' class to the <html> element
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDark) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [isDark]);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 theme-transition">
+    <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-200">
       <Routes>
         {/* Home route - Travel Planner */}
         <Route path="/" element={<TravelPlannerHome />} />
@@ -23,13 +40,13 @@ function App() {
 
 // Simple 404 component with dark theme support
 const NotFound = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 theme-transition">
+  <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
     <div className="text-center">
-      <h1 className="text-6xl font-bold text-gray-900 dark:text-white mb-4 theme-transition">404</h1>
-      <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 theme-transition">Page not found</p>
+      <h1 className="text-6xl font-bold text-gray-900 dark:text-white mb-4 transition-colors duration-200">404</h1>
+      <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 transition-colors duration-200">Page not found</p>
       <a
         href="/"
-        className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-colors theme-transition"
+        className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-colors duration-200"
       >
         Go Home
       </a>
@@ -38,6 +55,7 @@ const NotFound = () => (
 );
 
 export default App;
+
 
 -- ./src/app/main.tsx --
 // src/app/main.tsx
@@ -82,12 +100,12 @@ export const useTypedSelector: TypedUseSelectorHook<RootState> = useSelector;
 import { configureStore } from "@reduxjs/toolkit";
 import { setupListeners } from "@reduxjs/toolkit/query";
 import { travelApi } from "../../services/api/travel/travelApi";
-import themeSlice from "../../features/theme/themeSlice";
+import themeReducer from "../../features/theme/themeSlice";
 
 export const store = configureStore({
     reducer: {
         [travelApi.reducerPath]: travelApi.reducer, // Add travel API reducer
-        theme: themeSlice, // Add theme reducer
+        theme: themeReducer, // Add theme reducer
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware().concat(
@@ -101,6 +119,7 @@ setupListeners(store.dispatch);
 // Inferred types for app-wide usage
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
+
 
 -- ./src/features/auth/authSlice.ts --
 
@@ -205,7 +224,7 @@ const themeSlice = createSlice({
             const newMode: ThemeMode = state.isDark ? 'light' : 'dark';
 
             state.mode = newMode;
-            state.isDark = newMode === 'dark';
+            state.isDark = !state.isDark; // Correctly toggle the isDark state
 
             // Save to localStorage
             if (typeof window !== 'undefined') {
@@ -243,13 +262,14 @@ export const selectIsInitialized = (state: { theme: ThemeState }) => state.theme
 -- ./src/utils/constants/api_constants.ts --
 export class ApiConstants {
     static readonly DUMMY_JSON_BASE_URL = "https://dummyjson.com";
-    static readonly TRAVEL_API_BASE_URL = "https://074c-152-52-60-98.ngrok-free.app";
+    static readonly TRAVEL_API_BASE_URL = "https://e415-152-52-60-98.ngrok-free.app";
     static readonly TRAVEL_QUERY_ENDPOINT = "/query";
 }
 
 -- ./src/utils/constants/app_constants.ts --
 // Default example questions for the travel planner
 export const EXAMPLE_TRAVEL_QUESTIONS = [
+    "Plan a 3-day trip to Pattaya with a budget of $1000",
     "Plan a 5-day trip to Paris with a budget of $2000",
     "Show me a budget-friendly plan for Bangkok",
     "Plan a family vacation in Tokyo for 7 days",
@@ -395,9 +415,7 @@ export default config
 
 
 -- ./src/styles/index.css --
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
+@import "tailwindcss";
 
 body {
   margin: 0;
@@ -405,24 +423,17 @@ body {
   min-height: 100vh;
 }
 
-/* Prevent flash of unstyled content during theme changes */
+/* Set color scheme for proper browser rendering */
 html {
   color-scheme: light dark;
 }
 
-/* Theme transition utility - enhanced for better performance */
-.theme-transition {
-  transition-property: background-color, border-color, color, box-shadow, fill, stroke;
-  transition-duration: 200ms;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Smooth scrolling with theme awareness */
+/* Smooth scrolling */
 * {
   scroll-behavior: smooth;
 }
 
-/* Enhanced scrollbar styling for better dark mode support */
+/* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -476,28 +487,9 @@ html {
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
-  .theme-transition {
-    transition: none;
-  }
-  
   * {
     scroll-behavior: auto;
   }
-}
-
-/* Force dark mode styles to work - debugging aid */
-.dark {
-  color-scheme: dark;
-}
-
-/* Test styles to verify dark mode is working */
-.debug-dark-test {
-  background-color: white;
-}
-
-.dark .debug-dark-test {
-  background-color: #1f2937 !important;
-  color: white !important;
 }
 
 -- ./src/components/ui/Loaders.tsx --
@@ -634,54 +626,21 @@ export default {
 -- ./src/components/ui/ThemeToggle.tsx --
 // src/components/ui/ThemeToggle.tsx
 import React from 'react';
-import { Sun, Moon, Monitor } from 'lucide-react';
+import { Sun, Moon } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../app/store/hooks';
-import {
-    setThemeMode,
-    toggleTheme,
-    selectThemeMode,
-    selectIsDark,
-    selectIsInitialized,
-    type ThemeMode
-} from '../../features/theme/themeSlice';
+import { selectIsDark, toggleTheme } from '../../features/theme/themeSlice';
 
 interface ThemeToggleProps {
-    variant?: 'simple' | 'detailed';
     size?: 'sm' | 'md' | 'lg';
 }
 
-const ThemeToggle: React.FC<ThemeToggleProps> = ({
-    variant = 'simple',
-    size = 'md'
-}) => {
+const ThemeToggle: React.FC<ThemeToggleProps> = ({ size = 'md' }) => {
     const dispatch = useAppDispatch();
-    const themeMode = useAppSelector(selectThemeMode);
     const isDark = useAppSelector(selectIsDark);
-    const isInitialized = useAppSelector(selectIsInitialized);
 
     const handleToggle = () => {
-        console.log('🎛️ ThemeToggle: Toggle clicked, current state:', { themeMode, isDark });
-        console.log('🎛️ ThemeToggle: DOM classes before toggle:', document.documentElement.classList.toString());
-
         dispatch(toggleTheme());
-
-        // Log after a brief delay to see the change
-        setTimeout(() => {
-            console.log('🎛️ ThemeToggle: DOM classes after toggle:', document.documentElement.classList.toString());
-        }, 100);
     };
-
-    const handleModeSelect = (mode: ThemeMode) => {
-        console.log('🎛️ ThemeToggle: Mode selected:', mode);
-        dispatch(setThemeMode(mode));
-    };
-
-    // Show loading state if not initialized
-    if (!isInitialized) {
-        return (
-            <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse theme-transition"></div>
-        );
-    }
 
     const sizeClasses = {
         sm: 'w-8 h-8',
@@ -695,215 +654,36 @@ const ThemeToggle: React.FC<ThemeToggleProps> = ({
         lg: 'w-6 h-6'
     };
 
-    if (variant === 'simple') {
-        return (
-            <div className="relative">
-                {/* Debug info */}
-                <div className="absolute -top-8 left-0 text-xs text-gray-500 whitespace-nowrap pointer-events-none">
-                    {themeMode} | {isDark ? 'dark' : 'light'}
-                </div>
-
-                <button
-                    onClick={handleToggle}
-                    className={`
-                        ${sizeClasses[size]} 
-                        flex items-center justify-center
-                        bg-gray-100 hover:bg-gray-200 
-                        dark:bg-gray-800 dark:hover:bg-gray-700
-                        rounded-lg transition-all duration-200
-                        focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
-                        dark:focus:ring-offset-gray-900
-                        theme-transition
-                        border-2
-                        ${isDark ? 'border-yellow-400' : 'border-blue-400'}
-                    `}
-                    aria-label={`Switch to ${isDark ? 'light' : 'dark'} theme`}
-                    title={`Current: ${themeMode} theme (${isDark ? 'dark' : 'light'}). Click to toggle.`}
-                >
-                    {isDark ? (
-                        <Sun className={`${iconSizes[size]} text-yellow-500`} />
-                    ) : (
-                        <Moon className={`${iconSizes[size]} text-gray-600 dark:text-gray-300`} />
-                    )}
-                </button>
-            </div>
-        );
-    }
-
     return (
-        <div className="relative">
-            <div className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 theme-transition">
-                {(['light', 'system', 'dark'] as ThemeMode[]).map((mode) => {
-                    const isActive = themeMode === mode;
-                    const Icon = mode === 'light' ? Sun : mode === 'dark' ? Moon : Monitor;
-
-                    return (
-                        <button
-                            key={mode}
-                            onClick={() => handleModeSelect(mode)}
-                            className={`
-                                ${sizeClasses[size]}
-                                flex items-center justify-center rounded-md transition-all duration-200
-                                focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
-                                dark:focus:ring-offset-gray-900
-                                ${isActive
-                                    ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                                }
-                                theme-transition
-                            `}
-                            aria-label={`Switch to ${mode} theme`}
-                            title={`${mode.charAt(0).toUpperCase() + mode.slice(1)} theme`}
-                            aria-pressed={isActive}
-                        >
-                            <Icon className={iconSizes[size]} />
-                        </button>
-                    );
-                })}
-            </div>
-        </div>
+        <button
+            onClick={handleToggle}
+            className={`
+        ${sizeClasses[size]} 
+        flex items-center justify-center
+        bg-gray-100 hover:bg-gray-200 
+        dark:bg-gray-800 dark:hover:bg-gray-700
+        rounded-lg transition-all duration-200
+        focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
+        dark:focus:ring-offset-gray-900
+      `}
+            aria-label={`Switch to ${isDark ? 'light' : 'dark'} theme`}
+            title={`Switch to ${isDark ? 'light' : 'dark'} theme`}
+        >
+            {isDark ? (
+                <Sun className={`${iconSizes[size]} text-yellow-500`} />
+            ) : (
+                <Moon className={`${iconSizes[size]} text-gray-600 dark:text-gray-300`} />
+            )}
+        </button>
     );
 };
 
 export default ThemeToggle;
 
+
 -- ./src/vite-env.d.ts --
 /// <reference types="vite/client" />
 
-
--- ./src/hooks/useTheme.ts --
-// src/hooks/useTheme.ts
-import { useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from '../app/store/hooks';
-import {
-    initializeTheme,
-    setSystemPreference,
-    selectIsDark,
-    selectThemeMode,
-    selectSystemPreference,
-    selectIsInitialized
-} from '../features/theme/themeSlice';
-
-export const useTheme = () => {
-    const dispatch = useAppDispatch();
-    const isDark = useAppSelector(selectIsDark);
-    const themeMode = useAppSelector(selectThemeMode);
-    const systemPreference = useAppSelector(selectSystemPreference);
-    const isInitialized = useAppSelector(selectIsInitialized);
-
-    // Initialize theme once when component mounts
-    useEffect(() => {
-        console.log('🔧 useTheme: Initializing theme...');
-        dispatch(initializeTheme());
-    }, [dispatch]);
-
-    // Apply theme to DOM whenever isDark changes and theme is initialized
-    useEffect(() => {
-        if (!isInitialized) {
-            console.log('🔧 useTheme: Skipping DOM update - not initialized yet');
-            return;
-        }
-
-        console.log('🔧 useTheme: Applying theme to DOM, isDark:', isDark);
-
-        const root = document.documentElement;
-
-        if (isDark) {
-            root.classList.add('dark');
-            console.log('🔧 useTheme: Added dark class');
-        } else {
-            root.classList.remove('dark');
-            console.log('🔧 useTheme: Removed dark class');
-        }
-
-        // Update meta theme-color for mobile browsers
-        let metaThemeColor = document.querySelector('meta[name="theme-color"]');
-        const themeColor = isDark ? '#1f2937' : '#ffffff';
-
-        if (metaThemeColor) {
-            metaThemeColor.setAttribute('content', themeColor);
-        } else {
-            metaThemeColor = document.createElement('meta');
-            metaThemeColor.setAttribute('name', 'theme-color');
-            metaThemeColor.setAttribute('content', themeColor);
-            document.getElementsByTagName('head')[0].appendChild(metaThemeColor);
-        }
-
-        console.log('🔧 useTheme: DOM classes now:', root.classList.toString());
-    }, [isDark, isInitialized]);
-
-    // Listen for system theme changes
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-
-        const handleChange = (e: MediaQueryListEvent) => {
-            console.log('🔧 useTheme: System preference changed:', e.matches ? 'dark' : 'light');
-            dispatch(setSystemPreference(e.matches ? 'dark' : 'light'));
-        };
-
-        console.log('🔧 useTheme: Setting up system preference listener');
-
-        // Set initial system preference
-        const currentSystemPref = mediaQuery.matches ? 'dark' : 'light';
-        console.log('🔧 useTheme: Current system preference:', currentSystemPref);
-
-        if (systemPreference !== currentSystemPref) {
-            dispatch(setSystemPreference(currentSystemPref));
-        }
-
-        // Listen for changes
-        mediaQuery.addEventListener('change', handleChange);
-
-        return () => {
-            console.log('🔧 useTheme: Cleaning up system preference listener');
-            mediaQuery.removeEventListener('change', handleChange);
-        };
-    }, [dispatch, systemPreference]);
-
-    return {
-        isDark,
-        themeMode,
-        systemPreference,
-        isInitialized
-    };
-};
-
-// Hook for theme-aware class names
-export const useThemeClasses = () => {
-    const { isDark } = useTheme();
-
-    return {
-        // Background classes
-        bgPrimary: 'bg-white dark:bg-gray-900',
-        bgSecondary: 'bg-gray-50 dark:bg-gray-800',
-        bgTertiary: 'bg-gray-100 dark:bg-gray-700',
-
-        // Text classes
-        textPrimary: 'text-gray-900 dark:text-white',
-        textSecondary: 'text-gray-600 dark:text-gray-300',
-        textTertiary: 'text-gray-500 dark:text-gray-400',
-
-        // Border classes
-        border: 'border-gray-200 dark:border-gray-700',
-        borderLight: 'border-gray-100 dark:border-gray-800',
-
-        // Interactive classes
-        hover: 'hover:bg-gray-50 dark:hover:bg-gray-800',
-
-        // Common component classes
-        card: 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700',
-        input: 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white',
-        button: 'bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600',
-
-        // Utility
-        isDark,
-        transition: 'theme-transition'
-    };
-};
-
-export default useTheme;
 
 -- ./src/pages/home/HomeScreen.tsx --
 
@@ -1029,21 +809,21 @@ const TravelPlanDisplay: React.FC<TravelPlanDisplayProps> = ({ data, onNewSearch
         const tableData = parseTableContent(content);
 
         return (
-            <div key={index} className={`${bgColor} ${darkBgColor} rounded-xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm theme-transition`}>
+            <div key={index} className={`${bgColor} ${darkBgColor} rounded-xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm transition-colors duration-200`}>
                 <div className="flex items-center space-x-3 mb-4">
-                    <div className={`${iconColor} ${darkIconColor} ${bgColor} ${darkBgColor} p-2 rounded-lg theme-transition`}>
+                    <div className={`${iconColor} ${darkIconColor} ${bgColor} ${darkBgColor} p-2 rounded-lg transition-colors duration-200`}>
                         {icon}
                     </div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white theme-transition">{title}</h3>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white transition-colors duration-200">{title}</h3>
                 </div>
 
                 {tableData ? (
                     <div className="overflow-x-auto">
-                        <table className="w-full bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700 theme-transition">
+                        <table className="w-full bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700 transition-colors duration-200">
                             <thead className="bg-gray-50 dark:bg-gray-700">
                                 <tr>
                                     {tableData.headers.map((header, i) => (
-                                        <th key={i} className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white theme-transition">
+                                        <th key={i} className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white transition-colors duration-200">
                                             {header}
                                         </th>
                                     ))}
@@ -1053,7 +833,7 @@ const TravelPlanDisplay: React.FC<TravelPlanDisplayProps> = ({ data, onNewSearch
                                 {tableData.rows.map((row, i) => (
                                     <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                                         {row.map((cell, j) => (
-                                            <td key={j} className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 theme-transition">
+                                            <td key={j} className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 transition-colors duration-200">
                                                 {cell}
                                             </td>
                                         ))}
@@ -1063,15 +843,15 @@ const TravelPlanDisplay: React.FC<TravelPlanDisplayProps> = ({ data, onNewSearch
                         </table>
                     </div>
                 ) : (
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-100 dark:border-gray-700 theme-transition">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-100 dark:border-gray-700 transition-colors duration-200">
                         {content.split('\n').map((line, i) => {
                             const trimmedLine = line.trim();
 
                             if (trimmedLine.startsWith('- ')) {
                                 return (
                                     <div key={i} className="flex items-start space-x-2 mb-2">
-                                        <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full mt-2 flex-shrink-0 theme-transition"></div>
-                                        <p className="text-gray-700 dark:text-gray-300 theme-transition">{trimmedLine.replace('- ', '')}</p>
+                                        <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full mt-2 flex-shrink-0 transition-colors duration-200"></div>
+                                        <p className="text-gray-700 dark:text-gray-300 transition-colors duration-200">{trimmedLine.replace('- ', '')}</p>
                                     </div>
                                 );
                             } else if (trimmedLine.match(/^\d+\./)) {
@@ -1079,15 +859,15 @@ const TravelPlanDisplay: React.FC<TravelPlanDisplayProps> = ({ data, onNewSearch
                                 const text = trimmedLine.replace(/^\d+\.\s*/, '');
                                 return (
                                     <div key={i} className="flex items-start space-x-3 mb-3">
-                                        <div className="bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-sm font-semibold px-2 py-1 rounded-full min-w-[24px] text-center theme-transition">
+                                        <div className="bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 text-sm font-semibold px-2 py-1 rounded-full min-w-[24px] text-center transition-colors duration-200">
                                             {number}
                                         </div>
-                                        <p className="text-gray-700 dark:text-gray-300 flex-1 theme-transition">{text}</p>
+                                        <p className="text-gray-700 dark:text-gray-300 flex-1 transition-colors duration-200">{text}</p>
                                     </div>
                                 );
                             } else if (trimmedLine) {
                                 return (
-                                    <p key={i} className="text-gray-700 dark:text-gray-300 mb-2 leading-relaxed theme-transition">
+                                    <p key={i} className="text-gray-700 dark:text-gray-300 mb-2 leading-relaxed transition-colors duration-200">
                                         {trimmedLine}
                                     </p>
                                 );
@@ -1108,14 +888,14 @@ const TravelPlanDisplay: React.FC<TravelPlanDisplayProps> = ({ data, onNewSearch
             <div className="flex items-center justify-between">
                 <button
                     onClick={onNewSearch}
-                    className="flex items-center space-x-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 rounded-lg px-3 py-2 theme-transition"
+                    className="flex items-center space-x-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 rounded-lg px-3 py-2 duration-200"
                     aria-label="Plan another trip"
                 >
                     <ArrowLeft className="w-5 h-5" />
                     <span className="font-medium">Plan Another Trip</span>
                 </button>
 
-                <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 theme-transition">
+                <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 transition-colors duration-200">
                     <MapPin className="w-5 h-5" />
                     <span className="font-medium">Your Personalized Travel Plan</span>
                 </div>
@@ -1126,15 +906,15 @@ const TravelPlanDisplay: React.FC<TravelPlanDisplayProps> = ({ data, onNewSearch
                 {sections.length > 0 ? (
                     sections.map((section, index) => renderSection(section, index))
                 ) : (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center border border-gray-200 dark:border-gray-700 theme-transition">
-                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4 theme-transition">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center border border-gray-200 dark:border-gray-700 transition-colors duration-200">
+                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4 transition-colors duration-200">
                             <MapPin className="w-8 h-8 text-gray-400 dark:text-gray-500" />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 theme-transition">No Travel Plan Found</h3>
-                        <p className="text-gray-600 dark:text-gray-300 mb-4 theme-transition">We couldn't parse your travel plan. Please try generating a new one.</p>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 transition-colors duration-200">No Travel Plan Found</h3>
+                        <p className="text-gray-600 dark:text-gray-300 mb-4 transition-colors duration-200">We couldn't parse your travel plan. Please try generating a new one.</p>
                         <button
                             onClick={onNewSearch}
-                            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg transition-colors theme-transition"
+                            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg transition-colors duration-200"
                         >
                             Generate New Plan
                         </button>
@@ -1143,23 +923,23 @@ const TravelPlanDisplay: React.FC<TravelPlanDisplayProps> = ({ data, onNewSearch
             </div>
 
             {/* Action Buttons */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 theme-transition">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 transition-colors duration-200">
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <button
-                        className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 theme-transition"
+                        className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 duration-200"
                         aria-label="Save this travel plan"
                     >
                         Save This Plan
                     </button>
                     <button
-                        className="px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 theme-transition"
+                        className="px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 duration-200"
                         aria-label="Share this travel plan"
                     >
                         Share Plan
                     </button>
                     <button
                         onClick={onNewSearch}
-                        className="px-6 py-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 theme-transition"
+                        className="px-6 py-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 duration-200"
                         aria-label="Create a new travel plan"
                     >
                         Create New Plan
@@ -1174,12 +954,13 @@ export default TravelPlanDisplay;
 
 -- ./src/pages/travel/TravelPlannerHome.tsx --
 // src/pages/travel/TravelPlannerHome.tsx
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Send, MapPin, Calendar, DollarSign, Hotel, Utensils, Camera, ArrowRight, AlertCircle } from 'lucide-react';
 import { useGetTravelPlanMutation } from '../../services/api/travel/travelApi';
 import { EXAMPLE_TRAVEL_QUESTIONS } from '../../utils/constants/app_constants';
 import TravelPlanDisplay from './TravelPlanDisplay';
 import ThemeToggle from '../../components/ui/ThemeToggle';
+import { travelQuerySchema } from '../../utils/validation/schema';
 
 interface ValidationError {
     field: string;
@@ -1189,72 +970,27 @@ interface ValidationError {
 const TravelPlannerHome: React.FC = () => {
     const [question, setQuestion] = useState('');
     const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
-    const [getTravelPlan, { data, error, isLoading }] = useGetTravelPlanMutation();
-
-    const validateForm = useCallback((questionText: string): ValidationError[] => {
-        const errors: ValidationError[] = [];
-
-        if (!questionText || questionText.trim().length === 0) {
-            errors.push({
-                field: 'question',
-                message: 'Please enter your travel question'
-            });
-            return errors;
-        }
-
-        if (questionText.trim().length < 10) {
-            errors.push({
-                field: 'question',
-                message: 'Please provide more details about your travel plans (at least 10 characters)'
-            });
-        }
-
-        if (questionText.trim().length > 500) {
-            errors.push({
-                field: 'question',
-                message: 'Please keep your question under 500 characters'
-            });
-        }
-
-        // Check for travel-related keywords
-        const lowerQuestion = questionText.toLowerCase();
-        const travelKeywords = ['trip', 'travel', 'vacation', 'plan', 'visit', 'tour', 'holiday', 'journey'];
-        const hasKeyword = travelKeywords.some(keyword => lowerQuestion.includes(keyword));
-
-        if (!hasKeyword) {
-            errors.push({
-                field: 'question',
-                message: 'Please include travel-related keywords in your question (e.g., trip, travel, vacation, plan)'
-            });
-        }
-
-        return errors;
-    }, []);
+    const [getTravelPlan, { data, error, isLoading, reset }] = useGetTravelPlanMutation();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-
-        // Clear previous validation errors
         setValidationErrors([]);
 
-        if (!question.trim()) {
-            setValidationErrors([{ field: 'question', message: 'Please enter your travel question' }]);
-            return;
-        }
+        const validationResult = travelQuerySchema.safeParse({ question: question.trim() });
 
-        // Validate the form
-        const errors = validateForm(question.trim());
-        if (errors.length > 0) {
-            setValidationErrors(errors);
+        if (!validationResult.success) {
+            const formattedErrors = validationResult.error.errors.map((err) => ({
+                field: err.path[0].toString(),
+                message: err.message,
+            }));
+            setValidationErrors(formattedErrors);
             return;
         }
 
         try {
-            await getTravelPlan({ question: question.trim() }).unwrap();
+            await getTravelPlan({ question: validationResult.data.question }).unwrap();
         } catch (err: any) {
             console.error('Error getting travel plan:', err);
-
-            // Handle validation errors from API
             if (err.status === 'VALIDATION_ERROR') {
                 setValidationErrors([{ field: 'question', message: err.data }]);
             }
@@ -1279,30 +1015,28 @@ const TravelPlannerHome: React.FC = () => {
     const handleReset = () => {
         setQuestion('');
         setValidationErrors([]);
-        // Reset the data by reloading - in a real app, you'd want to reset the RTK Query state
-        window.location.reload();
+        // Reset the data by calling the reset function from the hook
+        reset();
     };
 
     const hasValidationErrors = validationErrors.length > 0;
     const questionError = validationErrors.find(err => err.field === 'question');
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 theme-transition">
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 transition-colors duration-200">
             {/* Header */}
-            <header className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700 theme-transition">
+            <header className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700 transition-colors duration-200">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-indigo-600 dark:bg-indigo-500 rounded-lg flex items-center justify-center theme-transition">
+                            <div className="w-10 h-10 bg-indigo-600 dark:bg-indigo-500 rounded-lg flex items-center justify-center transition-colors duration-200">
                                 <MapPin className="w-6 h-6 text-white" />
                             </div>
-                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white theme-transition">AI Trip Planner</h1>
+                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white transition-colors duration-200">AI Trip Planner</h1>
                         </div>
 
                         {/* Theme Toggle */}
-                        <div className="flex items-center space-x-4">
-                            <ThemeToggle variant="simple" size="md" />
-                        </div>
+                        <ThemeToggle size="md" />
                     </div>
                 </div>
             </header>
@@ -1312,10 +1046,10 @@ const TravelPlannerHome: React.FC = () => {
                     <>
                         {/* Hero Section */}
                         <div className="text-center mb-12">
-                            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4 theme-transition">
+                            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4 transition-colors duration-200">
                                 Plan Your Perfect Trip with AI
                             </h2>
-                            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto theme-transition">
+                            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto transition-colors duration-200">
                                 Get personalized travel plans, recommendations, and itineraries tailored just for you.
                                 Simply describe your dream destination and let our AI do the rest.
                             </p>
@@ -1323,33 +1057,33 @@ const TravelPlannerHome: React.FC = () => {
 
                         {/* Features Grid */}
                         <div className="grid md:grid-cols-4 gap-6 mb-12">
-                            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 theme-transition">
-                                <Calendar className="w-10 h-10 text-indigo-600 dark:text-indigo-400 mb-4 theme-transition" />
-                                <h3 className="font-semibold text-gray-900 dark:text-white mb-2 theme-transition">Smart Itineraries</h3>
-                                <p className="text-gray-600 dark:text-gray-300 text-sm theme-transition">Optimized day-by-day plans based on your preferences</p>
+                            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 transition-colors duration-200">
+                                <Calendar className="w-10 h-10 text-indigo-600 dark:text-indigo-400 mb-4 transition-colors duration-200" />
+                                <h3 className="font-semibold text-gray-900 dark:text-white mb-2 transition-colors duration-200">Smart Itineraries</h3>
+                                <p className="text-gray-600 dark:text-gray-300 text-sm transition-colors duration-200">Optimized day-by-day plans based on your preferences</p>
                             </div>
-                            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 theme-transition">
-                                <Hotel className="w-10 h-10 text-indigo-600 dark:text-indigo-400 mb-4 theme-transition" />
-                                <h3 className="font-semibold text-gray-900 dark:text-white mb-2 theme-transition">Hotel Recommendations</h3>
-                                <p className="text-gray-600 dark:text-gray-300 text-sm theme-transition">Curated accommodations for every budget</p>
+                            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 transition-colors duration-200">
+                                <Hotel className="w-10 h-10 text-indigo-600 dark:text-indigo-400 mb-4 transition-colors duration-200" />
+                                <h3 className="font-semibold text-gray-900 dark:text-white mb-2 transition-colors duration-200">Hotel Recommendations</h3>
+                                <p className="text-gray-600 dark:text-gray-300 text-sm transition-colors duration-200">Curated accommodations for every budget</p>
                             </div>
-                            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 theme-transition">
-                                <Utensils className="w-10 h-10 text-indigo-600 dark:text-indigo-400 mb-4 theme-transition" />
-                                <h3 className="font-semibold text-gray-900 dark:text-white mb-2 theme-transition">Local Cuisine</h3>
-                                <p className="text-gray-600 dark:text-gray-300 text-sm theme-transition">Discover authentic restaurants and local specialties</p>
+                            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 transition-colors duration-200">
+                                <Utensils className="w-10 h-10 text-indigo-600 dark:text-indigo-400 mb-4 transition-colors duration-200" />
+                                <h3 className="font-semibold text-gray-900 dark:text-white mb-2 transition-colors duration-200">Local Cuisine</h3>
+                                <p className="text-gray-600 dark:text-gray-300 text-sm transition-colors duration-200">Discover authentic restaurants and local specialties</p>
                             </div>
-                            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 theme-transition">
-                                <DollarSign className="w-10 h-10 text-indigo-600 dark:text-indigo-400 mb-4 theme-transition" />
-                                <h3 className="font-semibold text-gray-900 dark:text-white mb-2 theme-transition">Budget Planning</h3>
-                                <p className="text-gray-600 dark:text-gray-300 text-sm theme-transition">Detailed cost breakdowns and budget estimates</p>
+                            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 transition-colors duration-200">
+                                <DollarSign className="w-10 h-10 text-indigo-600 dark:text-indigo-400 mb-4 transition-colors duration-200" />
+                                <h3 className="font-semibold text-gray-900 dark:text-white mb-2 transition-colors duration-200">Budget Planning</h3>
+                                <p className="text-gray-600 dark:text-gray-300 text-sm transition-colors duration-200">Detailed cost breakdowns and budget estimates</p>
                             </div>
                         </div>
 
                         {/* Search Form */}
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 mb-8 border border-gray-100 dark:border-gray-700 theme-transition">
+                        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 mb-8 border border-gray-100 dark:border-gray-700 transition-colors duration-200">
                             <form onSubmit={handleSubmit} className="space-y-6">
                                 <div>
-                                    <label htmlFor="travel-question" className="block text-lg font-medium text-gray-900 dark:text-white mb-3 theme-transition">
+                                    <label htmlFor="travel-question" className="block text-lg font-medium text-gray-900 dark:text-white mb-3 transition-colors duration-200">
                                         Where would you like to go?
                                     </label>
                                     <div className="relative">
@@ -1359,7 +1093,7 @@ const TravelPlannerHome: React.FC = () => {
                                             value={question}
                                             onChange={handleInputChange}
                                             placeholder="e.g., Plan a 7-day romantic trip to Italy with a budget of $3000"
-                                            className={`w-full px-6 py-4 pr-16 text-lg border rounded-xl focus:outline-none focus:ring-2 focus:border-transparent transition-colors theme-transition
+                                            className={`w-full px-6 py-4 pr-16 text-lg border rounded-xl focus:outline-none focus:ring-2 focus:border-transparent transition-colors duration-200
                                                 bg-white dark:bg-gray-700 
                                                 text-gray-900 dark:text-white 
                                                 placeholder-gray-500 dark:placeholder-gray-400
@@ -1374,7 +1108,7 @@ const TravelPlannerHome: React.FC = () => {
                                         <button
                                             type="submit"
                                             disabled={isLoading || !question.trim()}
-                                            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white p-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed theme-transition"
+                                            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white p-3 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             {isLoading ? (
                                                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1386,7 +1120,7 @@ const TravelPlannerHome: React.FC = () => {
 
                                     {/* Validation Error Display */}
                                     {questionError && (
-                                        <div id="question-error" className="mt-2 flex items-center space-x-2 text-red-600 dark:text-red-400 theme-transition">
+                                        <div id="question-error" className="mt-2 flex items-center space-x-2 text-red-600 dark:text-red-400 transition-colors duration-200">
                                             <AlertCircle className="w-4 h-4" />
                                             <span className="text-sm">{questionError.message}</span>
                                         </div>
@@ -1396,14 +1130,14 @@ const TravelPlannerHome: React.FC = () => {
 
                             {/* Example Questions */}
                             <div className="mt-6">
-                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 theme-transition">Try these examples:</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 transition-colors duration-200">Try these examples:</p>
                                 <div className="flex flex-wrap gap-2">
                                     {EXAMPLE_TRAVEL_QUESTIONS.map((example, index) => (
                                         <button
                                             key={index}
                                             onClick={() => handleExampleClick(example)}
                                             disabled={isLoading}
-                                            className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed theme-transition"
+                                            className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200 flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             <span>{example}</span>
                                             <ArrowRight className="w-3 h-3" />
@@ -1415,21 +1149,21 @@ const TravelPlannerHome: React.FC = () => {
 
                         {/* Loading State */}
                         {isLoading && (
-                            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-12 text-center border border-gray-100 dark:border-gray-700 theme-transition">
+                            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-12 text-center border border-gray-100 dark:border-gray-700 transition-colors duration-200">
                                 <div className="w-16 h-16 border-4 border-indigo-600 dark:border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2 theme-transition">Creating Your Perfect Trip</h3>
-                                <p className="text-gray-600 dark:text-gray-300 theme-transition">Our AI is analyzing destinations, costs, and creating your personalized itinerary...</p>
+                                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2 transition-colors duration-200">Creating Your Perfect Trip</h3>
+                                <p className="text-gray-600 dark:text-gray-300 transition-colors duration-200">Our AI is analyzing destinations, costs, and creating your personalized itinerary...</p>
                             </div>
                         )}
 
                         {/* Error State */}
                         {error && (
-                            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-6 text-center theme-transition">
+                            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-6 text-center transition-colors duration-200">
                                 <div className="w-12 h-12 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
                                 </div>
-                                <h3 className="text-lg font-semibold text-red-900 dark:text-red-300 mb-2 theme-transition">Something went wrong</h3>
-                                <p className="text-red-700 dark:text-red-400 theme-transition">
+                                <h3 className="text-lg font-semibold text-red-900 dark:text-red-300 mb-2 transition-colors duration-200">Something went wrong</h3>
+                                <p className="text-red-700 dark:text-red-400 transition-colors duration-200">
                                     {typeof error === 'object' && 'data' in error
                                         ? String(error.data)
                                         : 'We couldn\'t generate your travel plan. Please try again.'
@@ -1437,7 +1171,7 @@ const TravelPlannerHome: React.FC = () => {
                                 </p>
                                 <button
                                     onClick={() => setQuestion('')}
-                                    className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white rounded-lg transition-colors theme-transition"
+                                    className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white rounded-lg transition-colors duration-200"
                                 >
                                     Try Again
                                 </button>
@@ -1491,15 +1225,6 @@ export const travelApi = createApi({
     endpoints: (builder) => ({
         getTravelPlan: builder.mutation<TravelResponse, TravelQuery>({
             query: (travelQuery) => {
-                // Basic validation - ensure question is not empty
-                if (!travelQuery.question || travelQuery.question.trim().length === 0) {
-                    throw new Error('Travel question cannot be empty');
-                }
-
-                if (travelQuery.question.trim().length < 10) {
-                    throw new Error('Please provide more details about your travel plans (at least 10 characters)');
-                }
-
                 return {
                     url: ApiConstants.TRAVEL_QUERY_ENDPOINT,
                     method: "POST",
@@ -1507,7 +1232,10 @@ export const travelApi = createApi({
                         "Content-Type": "application/json",
                         "ngrok-skip-browser-warning": "true"
                     },
-                    body: travelQuery,
+                    body: JSON.stringify({
+                        ...travelQuery,
+                        question: travelQuery.question + " Don't use *,#@,%,^,&,() characters in the response. make headings bold and use bullet points for lists."
+                    }),
                 };
             },
             transformResponse: (response: any): TravelResponse => {

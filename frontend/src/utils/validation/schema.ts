@@ -55,22 +55,22 @@ export type CounterState = z.infer<typeof counterStateSchema>;
 export type TravelForm = z.infer<typeof travelFormSchema>;
 
 // Validation helper functions
-export const validateApiConstants = (constants: any) => {
+export const validateApiConstants = (constants: unknown) => {
     return apiConstantsSchema.safeParse(constants);
 };
 
-export const validateTravelQuery = (query: any) => {
+export const validateTravelQuery = (query: unknown) => {
     return travelQuerySchema.safeParse(query);
 };
 
-export const validateTravelResponse = (response: any) => {
+export const validateTravelResponse = (response: unknown) => {
     return travelResponseSchema.safeParse(response);
 };
 
-export const validateCounterState = (state: any) => {
+export const validateCounterState = (state: unknown) => {
     return counterStateSchema.safeParse(state);
 };
 
-export const validateTravelForm = (form: any) => {
+export const validateTravelForm = (form: unknown) => {
     return travelFormSchema.safeParse(form);
 };

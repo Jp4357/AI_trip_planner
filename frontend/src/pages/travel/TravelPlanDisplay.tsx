@@ -2,7 +2,7 @@
 import React from 'react';
 import { ArrowLeft, MapPin, Calendar, DollarSign, Hotel, Utensils, Car, Camera, Sun, Activity } from 'lucide-react';
 import { TravelSectionType, getSectionType, type TravelSectionTypeValue } from '../../utils/constants/app_constants';
-import type { TravelResponse } from '../../services/api/travel/travelApi';
+import type { TravelResponse } from '../../utils/validation/schema';
 
 interface TravelPlanDisplayProps {
     data: TravelResponse;
@@ -24,7 +24,7 @@ const TravelPlanDisplay: React.FC<TravelPlanDisplayProps> = ({ data, onNewSearch
         return sections.map(section => section.trim());
     };
 
-    const parseTableContent = (content: string) => {
+    const parseTableContent = (content: string): { headers: string[]; rows: string[][] } | null => {
         const lines = content.split('\n').filter(line => line.trim());
         const tableLines = lines.filter(line => line.includes('|'));
 
