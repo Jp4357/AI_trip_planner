@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Send, MapPin, ArrowRight, AlertCircle, Mail, CheckCircle, X, Utensils, Calendar, DollarSign, Hotel } from 'lucide-react';
 import { useGetTravelPlanMutation } from '../../services/api/travel/travelApi';
 import { useSendEmailMutation } from '../../services/api/email/emailApi';
-import { EXAMPLE_TRAVEL_QUESTIONS } from '../../utils/constants/app_constants';
+import { EXAMPLE_TRAVEL_QUESTIONS, DEFAULT_EMAIL_BODY } from '../../utils/constants/app_constants';
 import TravelPlanDisplay from './TravelPlanDisplay';
 import ThemeToggle from '../../components/ui/ThemeToggle';
 import { travelQuerySchema, sendEmailSchema } from '../../utils/validation/schema';
@@ -141,8 +141,8 @@ const TravelPlannerHome: React.FC = () => {
                     .map(email => email.trim())
                     .filter(email => email.length > 0);
 
-                // Use the travel plan answer as body if user didn't provide custom body
-                const finalEmailBody = emailBody.trim() || travelPlanData.answer;
+                                const userMessage = emailBody.trim();
+                const finalEmailBody = userMessage ? userMessage : DEFAULT_EMAIL_BODY;
 
                 // Don't await this - let it run in background
                 sendEmail({
@@ -424,7 +424,7 @@ const TravelPlannerHome: React.FC = () => {
                                                     id="email-body"
                                                     value={emailBody}
                                                     onChange={(e) => setEmailBody(e.target.value)}
-                                                    placeholder="Add a custom message or leave empty to use the travel plan as email content"
+                                                    placeholder="Add a custom message"
                                                     rows={3}
                                                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                                                              bg-white dark:bg-gray-700 text-gray-900 dark:text-white
@@ -434,7 +434,7 @@ const TravelPlannerHome: React.FC = () => {
                                                     disabled={isLoading}
                                                 />
                                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                    If left empty, the generated travel plan will be used as the email content
+                                                    Add a custom message to your email (optional)
                                                 </p>
                                             </div>
                                         </div>

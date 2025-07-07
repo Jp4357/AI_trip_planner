@@ -39,3 +39,13 @@ export const getSectionType = (title: string): TravelSectionTypeValue => {
 
     return TravelSectionType.ITINERARY; // default
 };
+
+// Default email body
+export const DEFAULT_EMAIL_BODY = `Greetings from EasyAI Itinerary,
+
+Thank you for using our platform to plan your trip.
+
+Your travel plan has been generated successfully on our platform.
+
+Safe travels,
+The EasyAI Itinerary Team`;
