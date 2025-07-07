@@ -1,20 +1,20 @@
 // src/app/store/store.ts
 import { configureStore } from "@reduxjs/toolkit";
 import { setupListeners } from "@reduxjs/toolkit/query";
-import { productsApi } from "../../services/api/dummyData/dummyData";
 import { travelApi } from "../../services/api/travel/travelApi";
-import counterSlice from "../../features/counter/counterSlice";
+import themeReducer from "../../features/theme/themeSlice";
+import { emailApi } from "../../services/api/email/emailApi"; // Import the new email API
 
 export const store = configureStore({
     reducer: {
-        [productsApi.reducerPath]: productsApi.reducer,
         [travelApi.reducerPath]: travelApi.reducer, // Add travel API reducer
-        counter: counterSlice,
+        [emailApi.reducerPath]: emailApi.reducer, // Add email API reducer
+        theme: themeReducer, // Add theme reducer
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware().concat(
-            productsApi.middleware,
-            travelApi.middleware // Add travel API middleware
+            travelApi.middleware, // Add travel API middleware
+            emailApi.middleware // Add email API middleware
         ),
 });
 
