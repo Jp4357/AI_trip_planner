@@ -37,7 +37,7 @@ EasyAI Itinerary is a modern, AI-powered travel planning application that create
 ## 🛠️ Tech Stack
 
 ### **Frontend**
-- **React 18** - Modern React with hooks and concurrent features
+- **React 19** - Modern React with hooks and concurrent features
 - **TypeScript** - Type-safe development experience
 - **Tailwind CSS** - Utility-first CSS framework for rapid styling
 - **React Router** - Declarative routing for React applications
