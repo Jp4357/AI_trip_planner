@@ -1,4 +1,4 @@
-// src/utils/validation/schemas.ts
+// src/utils/validation/schema.ts
 import { z } from 'zod';
 
 // Travel API Schemas
@@ -20,19 +20,22 @@ export const travelResponseSchema = z.object({
     answer: z.string().min(1, 'Response cannot be empty')
 });
 
-// Counter State Schema
-export const counterStateSchema = z.object({
-    value: z.number().int('Counter value must be an integer')
+// Email Schema
+export const sendEmailSchema = z.object({
+    email: z.array(z.string().email('Invalid email address')),
+    subject: z.string().min(1, 'Subject cannot be empty'),
+    body: z.string().min(1, 'Body cannot be empty'),
 });
 
 // API Constants Schema
 export const apiConstantsSchema = z.object({
     DUMMY_JSON_BASE_URL: z.string().url('Invalid dummy JSON base URL'),
     TRAVEL_API_BASE_URL: z.string().url('Invalid travel API base URL'),
-    TRAVEL_QUERY_ENDPOINT: z.string().startsWith('/', 'Endpoint must start with /')
+    TRAVEL_QUERY_ENDPOINT: z.string().startsWith('/', 'Endpoint must start with /'),
+    SEND_EMAIL_ENDPOINT: z.string().startsWith('/', 'Endpoint must start with /')
 });
 
-// Form Validation Schemas
+// Form Validation Schema
 export const travelFormSchema = z.object({
     destination: z.string().optional(),
     budget: z.number().positive('Budget must be positive').optional(),
@@ -41,24 +44,13 @@ export const travelFormSchema = z.object({
     question: travelQuerySchema.shape.question
 });
 
-// Environment Variables Schema
-export const envSchema = z.object({
-    NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-    VITE_API_BASE_URL: z.string().url().optional(),
-    VITE_TRAVEL_API_URL: z.string().url().optional()
-});
-
 // Types derived from schemas
 export type TravelQuery = z.infer<typeof travelQuerySchema>;
 export type TravelResponse = z.infer<typeof travelResponseSchema>;
-export type CounterState = z.infer<typeof counterStateSchema>;
+export type SendEmail = z.infer<typeof sendEmailSchema>;
 export type TravelForm = z.infer<typeof travelFormSchema>;
 
 // Validation helper functions
-export const validateApiConstants = (constants: unknown) => {
-    return apiConstantsSchema.safeParse(constants);
-};
-
 export const validateTravelQuery = (query: unknown) => {
     return travelQuerySchema.safeParse(query);
 };
@@ -67,10 +59,14 @@ export const validateTravelResponse = (response: unknown) => {
     return travelResponseSchema.safeParse(response);
 };
 
-export const validateCounterState = (state: unknown) => {
-    return counterStateSchema.safeParse(state);
+export const validateSendEmail = (data: unknown) => {
+    return sendEmailSchema.safeParse(data);
 };
 
 export const validateTravelForm = (form: unknown) => {
     return travelFormSchema.safeParse(form);
+};
+
+export const validateApiConstants = (constants: unknown) => {
+    return apiConstantsSchema.safeParse(constants);
 };

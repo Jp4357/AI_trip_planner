@@ -1,7 +1,7 @@
 // Default example questions for the travel planner
 export const EXAMPLE_TRAVEL_QUESTIONS = [
-    "Plan a 3-day trip to Pattaya with a budget of $1000",
-    "Plan a 5-day trip to Paris with a budget of $2000",
+    "Plan a 3-day trip to Pattaya",
+    "Plan a 5-day trip to Paris",
     "Show me a budget-friendly plan for Bangkok",
     "Plan a family vacation in Tokyo for 7 days",
     "Create an adventure trip to New Zealand",

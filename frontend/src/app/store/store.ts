@@ -3,15 +3,18 @@ import { configureStore } from "@reduxjs/toolkit";
 import { setupListeners } from "@reduxjs/toolkit/query";
 import { travelApi } from "../../services/api/travel/travelApi";
 import themeReducer from "../../features/theme/themeSlice";
+import { emailApi } from "../../services/api/email/emailApi"; // Import the new email API
 
 export const store = configureStore({
     reducer: {
         [travelApi.reducerPath]: travelApi.reducer, // Add travel API reducer
+        [emailApi.reducerPath]: emailApi.reducer, // Add email API reducer
         theme: themeReducer, // Add theme reducer
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware().concat(
-            travelApi.middleware // Add travel API middleware
+            travelApi.middleware, // Add travel API middleware
+            emailApi.middleware // Add email API middleware
         ),
 });
 

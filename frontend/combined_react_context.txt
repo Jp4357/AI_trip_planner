@@ -101,15 +101,18 @@ import { configureStore } from "@reduxjs/toolkit";
 import { setupListeners } from "@reduxjs/toolkit/query";
 import { travelApi } from "../../services/api/travel/travelApi";
 import themeReducer from "../../features/theme/themeSlice";
+import { emailApi } from "../../services/api/email/emailApi"; // Import the new email API
 
 export const store = configureStore({
     reducer: {
         [travelApi.reducerPath]: travelApi.reducer, // Add travel API reducer
+        [emailApi.reducerPath]: emailApi.reducer, // Add email API reducer
         theme: themeReducer, // Add theme reducer
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware().concat(
-            travelApi.middleware // Add travel API middleware
+            travelApi.middleware, // Add travel API middleware
+            emailApi.middleware // Add email API middleware
         ),
 });
 
@@ -128,6 +131,7 @@ export type AppDispatch = typeof store.dispatch;
 // src/features/theme/themeSlice.ts
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
+import type { RootState } from '../../app/store/store';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -254,23 +258,24 @@ export const { initializeTheme, setThemeMode, toggleTheme, setSystemPreference }
 export default themeSlice.reducer;
 
 // Selectors
-export const selectThemeMode = (state: { theme: ThemeState }) => state.theme.mode;
-export const selectIsDark = (state: { theme: ThemeState }) => state.theme.isDark;
-export const selectSystemPreference = (state: { theme: ThemeState }) => state.theme.systemPreference;
-export const selectIsInitialized = (state: { theme: ThemeState }) => state.theme.isInitialized;
+export const selectThemeMode = (state: RootState) => state.theme.mode;
+export const selectIsDark = (state: RootState) => state.theme.isDark;
+export const selectSystemPreference = (state: RootState) => state.theme.systemPreference;
+export const selectIsInitialized = (state: RootState) => state.theme.isInitialized;
 
 -- ./src/utils/constants/api_constants.ts --
 export class ApiConstants {
     static readonly DUMMY_JSON_BASE_URL = "https://dummyjson.com";
-    static readonly TRAVEL_API_BASE_URL = "https://e415-152-52-60-98.ngrok-free.app";
+    static readonly TRAVEL_API_BASE_URL = "https://04aa-152-52-60-98.ngrok-free.app/";
     static readonly TRAVEL_QUERY_ENDPOINT = "/query";
+    static readonly SEND_EMAIL_ENDPOINT = "/send-email";
 }
 
 -- ./src/utils/constants/app_constants.ts --
 // Default example questions for the travel planner
 export const EXAMPLE_TRAVEL_QUESTIONS = [
-    "Plan a 3-day trip to Pattaya with a budget of $1000",
-    "Plan a 5-day trip to Paris with a budget of $2000",
+    "Plan a 3-day trip to Pattaya with a budget",
+    "Plan a 5-day trip to Paris with a budget",
     "Show me a budget-friendly plan for Bangkok",
     "Plan a family vacation in Tokyo for 7 days",
     "Create an adventure trip to New Zealand",
@@ -365,26 +370,37 @@ export type TravelQuery = z.infer<typeof travelQuerySchema>;
 export type TravelResponse = z.infer<typeof travelResponseSchema>;
 export type CounterState = z.infer<typeof counterStateSchema>;
 export type TravelForm = z.infer<typeof travelFormSchema>;
+export type SendEmail = z.infer<typeof sendEmailSchema>;
+export const sendEmailSchema = z.object({
+  email: z.array(z.string().email('Invalid email address')),
+  subject: z.string().min(1, 'Subject cannot be empty'),
+  body: z.string().min(1, 'Body cannot be empty'),
+});
+
 
 // Validation helper functions
-export const validateApiConstants = (constants: any) => {
+export const validateApiConstants = (constants: unknown) => {
     return apiConstantsSchema.safeParse(constants);
 };
 
-export const validateTravelQuery = (query: any) => {
+export const validateTravelQuery = (query: unknown) => {
     return travelQuerySchema.safeParse(query);
 };
 
-export const validateTravelResponse = (response: any) => {
+export const validateTravelResponse = (response: unknown) => {
     return travelResponseSchema.safeParse(response);
 };
 
-export const validateCounterState = (state: any) => {
+export const validateCounterState = (state: unknown) => {
     return counterStateSchema.safeParse(state);
 };
 
-export const validateTravelForm = (form: any) => {
+export const validateTravelForm = (form: unknown) => {
     return travelFormSchema.safeParse(form);
+};
+
+export const validateSendEmail = (data: unknown) => {
+    return sendEmailSchema.safeParse(data);
 };
 
 -- ./src/postcss.config.ts --
@@ -693,7 +709,7 @@ export default ThemeToggle;
 import React from 'react';
 import { ArrowLeft, MapPin, Calendar, DollarSign, Hotel, Utensils, Car, Camera, Sun, Activity } from 'lucide-react';
 import { TravelSectionType, getSectionType, type TravelSectionTypeValue } from '../../utils/constants/app_constants';
-import type { TravelResponse } from '../../services/api/travel/travelApi';
+import type { TravelResponse } from '../../utils/validation/schema';
 
 interface TravelPlanDisplayProps {
     data: TravelResponse;
@@ -715,7 +731,7 @@ const TravelPlanDisplay: React.FC<TravelPlanDisplayProps> = ({ data, onNewSearch
         return sections.map(section => section.trim());
     };
 
-    const parseTableContent = (content: string) => {
+    const parseTableContent = (content: string): { headers: string[]; rows: string[][] } | null => {
         const lines = content.split('\n').filter(line => line.trim());
         const tableLines = lines.filter(line => line.includes('|'));
 
@@ -954,9 +970,10 @@ export default TravelPlanDisplay;
 
 -- ./src/pages/travel/TravelPlannerHome.tsx --
 // src/pages/travel/TravelPlannerHome.tsx
-import React, { useState } from 'react';
-import { Send, MapPin, Calendar, DollarSign, Hotel, Utensils, Camera, ArrowRight, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Send, MapPin, ArrowRight, AlertCircle, Mail } from 'lucide-react';
 import { useGetTravelPlanMutation } from '../../services/api/travel/travelApi';
+import { useSendEmailMutation } from '../../services/api/email/emailApi';
 import { EXAMPLE_TRAVEL_QUESTIONS } from '../../utils/constants/app_constants';
 import TravelPlanDisplay from './TravelPlanDisplay';
 import ThemeToggle from '../../components/ui/ThemeToggle';
@@ -967,10 +984,17 @@ interface ValidationError {
     message: string;
 }
 
+interface ApiError {
+    status: string | number;
+    data: string;
+}
+
 const TravelPlannerHome: React.FC = () => {
     const [question, setQuestion] = useState('');
+    const [sendAsEmail, setSendAsEmail] = useState(false);
     const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
     const [getTravelPlan, { data, error, isLoading, reset }] = useGetTravelPlanMutation();
+    const [sendEmail, { isLoading: isSendingEmail, isSuccess: isEmailSent, isError: isEmailError }] = useSendEmailMutation();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -988,11 +1012,23 @@ const TravelPlannerHome: React.FC = () => {
         }
 
         try {
-            await getTravelPlan({ question: validationResult.data.question }).unwrap();
-        } catch (err: any) {
-            console.error('Error getting travel plan:', err);
-            if (err.status === 'VALIDATION_ERROR') {
-                setValidationErrors([{ field: 'question', message: err.data }]);
+            const travelPlanData = await getTravelPlan({
+                question: validationResult.data.question,
+            }).unwrap();
+
+            if (sendAsEmail && travelPlanData) {
+                console.log('📧 Triggering email delivery...');
+                await sendEmail({
+                    email: ['test@example.com'], // Replace with actual user email
+                    subject: 'Your AI-Generated Travel Plan',
+                    body: travelPlanData.answer,
+                }).unwrap();
+            }
+        } catch (err) {
+            console.error('Error in handleSubmit:', err);
+            const apiError = err as ApiError;
+            if (apiError.status === 'VALIDATION_ERROR') {
+                setValidationErrors([{ field: 'question', message: apiError.data }]);
             }
         }
     };
@@ -1006,16 +1042,19 @@ const TravelPlannerHome: React.FC = () => {
         const value = e.target.value;
         setQuestion(value);
 
-        // Clear validation errors when user starts typing
         if (validationErrors.length > 0 && value.trim()) {
             setValidationErrors([]);
         }
     };
 
+    const handleEmailToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setSendAsEmail(e.target.checked);
+    };
+
     const handleReset = () => {
         setQuestion('');
+        setSendAsEmail(false);
         setValidationErrors([]);
-        // Reset the data by calling the reset function from the hook
         reset();
     };
 
@@ -1032,10 +1071,8 @@ const TravelPlannerHome: React.FC = () => {
                             <div className="w-10 h-10 bg-indigo-600 dark:bg-indigo-500 rounded-lg flex items-center justify-center transition-colors duration-200">
                                 <MapPin className="w-6 h-6 text-white" />
                             </div>
-                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white transition-colors duration-200">AI Trip Planner</h1>
+                            <h1 className="text-2xl font-bold text-gray-900 dark:text-white transition-colors duration-200">EasyAI Itinerary</h1>
                         </div>
-
-                        {/* Theme Toggle */}
                         <ThemeToggle size="md" />
                     </div>
                 </div>
@@ -1044,42 +1081,7 @@ const TravelPlannerHome: React.FC = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {!data ? (
                     <>
-                        {/* Hero Section */}
-                        <div className="text-center mb-12">
-                            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4 transition-colors duration-200">
-                                Plan Your Perfect Trip with AI
-                            </h2>
-                            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto transition-colors duration-200">
-                                Get personalized travel plans, recommendations, and itineraries tailored just for you.
-                                Simply describe your dream destination and let our AI do the rest.
-                            </p>
-                        </div>
-
-                        {/* Features Grid */}
-                        <div className="grid md:grid-cols-4 gap-6 mb-12">
-                            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 transition-colors duration-200">
-                                <Calendar className="w-10 h-10 text-indigo-600 dark:text-indigo-400 mb-4 transition-colors duration-200" />
-                                <h3 className="font-semibold text-gray-900 dark:text-white mb-2 transition-colors duration-200">Smart Itineraries</h3>
-                                <p className="text-gray-600 dark:text-gray-300 text-sm transition-colors duration-200">Optimized day-by-day plans based on your preferences</p>
-                            </div>
-                            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 transition-colors duration-200">
-                                <Hotel className="w-10 h-10 text-indigo-600 dark:text-indigo-400 mb-4 transition-colors duration-200" />
-                                <h3 className="font-semibold text-gray-900 dark:text-white mb-2 transition-colors duration-200">Hotel Recommendations</h3>
-                                <p className="text-gray-600 dark:text-gray-300 text-sm transition-colors duration-200">Curated accommodations for every budget</p>
-                            </div>
-                            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 transition-colors duration-200">
-                                <Utensils className="w-10 h-10 text-indigo-600 dark:text-indigo-400 mb-4 transition-colors duration-200" />
-                                <h3 className="font-semibold text-gray-900 dark:text-white mb-2 transition-colors duration-200">Local Cuisine</h3>
-                                <p className="text-gray-600 dark:text-gray-300 text-sm transition-colors duration-200">Discover authentic restaurants and local specialties</p>
-                            </div>
-                            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 transition-colors duration-200">
-                                <DollarSign className="w-10 h-10 text-indigo-600 dark:text-indigo-400 mb-4 transition-colors duration-200" />
-                                <h3 className="font-semibold text-gray-900 dark:text-white mb-2 transition-colors duration-200">Budget Planning</h3>
-                                <p className="text-gray-600 dark:text-gray-300 text-sm transition-colors duration-200">Detailed cost breakdowns and budget estimates</p>
-                            </div>
-                        </div>
-
-                        {/* Search Form */}
+                        {/* Hero, Features, Form... */}
                         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 mb-8 border border-gray-100 dark:border-gray-700 transition-colors duration-200">
                             <form onSubmit={handleSubmit} className="space-y-6">
                                 <div>
@@ -1092,7 +1094,7 @@ const TravelPlannerHome: React.FC = () => {
                                             type="text"
                                             value={question}
                                             onChange={handleInputChange}
-                                            placeholder="e.g., Plan a 7-day romantic trip to Italy with a budget of $3000"
+                                            placeholder="e.g., Plan a 7-day romantic trip to Italy"
                                             className={`w-full px-6 py-4 pr-16 text-lg border rounded-xl focus:outline-none focus:ring-2 focus:border-transparent transition-colors duration-200
                                                 bg-white dark:bg-gray-700 
                                                 text-gray-900 dark:text-white 
@@ -1101,16 +1103,16 @@ const TravelPlannerHome: React.FC = () => {
                                                     ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
                                                     : 'border-gray-300 dark:border-gray-600 focus:ring-indigo-500'
                                                 }`}
-                                            disabled={isLoading}
+                                            disabled={isLoading || isSendingEmail}
                                             aria-invalid={hasValidationErrors}
                                             aria-describedby={questionError ? 'question-error' : undefined}
                                         />
                                         <button
                                             type="submit"
-                                            disabled={isLoading || !question.trim()}
+                                            disabled={isLoading || isSendingEmail || !question.trim()}
                                             className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white p-3 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            {isLoading ? (
+                                            {isLoading || isSendingEmail ? (
                                                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                             ) : (
                                                 <Send className="w-5 h-5" />
@@ -1118,7 +1120,6 @@ const TravelPlannerHome: React.FC = () => {
                                         </button>
                                     </div>
 
-                                    {/* Validation Error Display */}
                                     {questionError && (
                                         <div id="question-error" className="mt-2 flex items-center space-x-2 text-red-600 dark:text-red-400 transition-colors duration-200">
                                             <AlertCircle className="w-4 h-4" />
@@ -1126,9 +1127,34 @@ const TravelPlannerHome: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
+
+                                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600 transition-colors duration-200">
+                                    <div className="flex items-center space-x-3">
+                                        <input
+                                            id="send-as-email"
+                                            type="checkbox"
+                                            checked={sendAsEmail}
+                                            onChange={handleEmailToggle}
+                                            disabled={isLoading || isSendingEmail}
+                                            className="w-5 h-5 text-indigo-600 bg-white dark:bg-gray-600 border-gray-300 dark:border-gray-500 rounded focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:ring-2 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        />
+                                        <label
+                                            htmlFor="send-as-email"
+                                            className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer transition-colors duration-200"
+                                        >
+                                            <Mail className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                                            <span>Send travel plan to my email</span>
+                                        </label>
+                                    </div>
+                                    {sendAsEmail && (
+                                        <div className="flex items-center space-x-2 text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1 rounded-full">
+                                            <div className="w-2 h-2 bg-indigo-600 dark:bg-indigo-400 rounded-full animate-pulse"></div>
+                                            <span>Email enabled</span>
+                                        </div>
+                                    )}
+                                </div>
                             </form>
 
-                            {/* Example Questions */}
                             <div className="mt-6">
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 transition-colors duration-200">Try these examples:</p>
                                 <div className="flex flex-wrap gap-2">
@@ -1136,7 +1162,7 @@ const TravelPlannerHome: React.FC = () => {
                                         <button
                                             key={index}
                                             onClick={() => handleExampleClick(example)}
-                                            disabled={isLoading}
+                                            disabled={isLoading || isSendingEmail}
                                             className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200 flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             <span>{example}</span>
@@ -1147,33 +1173,56 @@ const TravelPlannerHome: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Loading State */}
-                        {isLoading && (
+                        {(isLoading || isSendingEmail) && (
                             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-12 text-center border border-gray-100 dark:border-gray-700 transition-colors duration-200">
                                 <div className="w-16 h-16 border-4 border-indigo-600 dark:border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2 transition-colors duration-200">Creating Your Perfect Trip</h3>
-                                <p className="text-gray-600 dark:text-gray-300 transition-colors duration-200">Our AI is analyzing destinations, costs, and creating your personalized itinerary...</p>
+                                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2 transition-colors duration-200">
+                                    {isSendingEmail ? 'Sending Email...' : 'Creating Your Perfect Trip'}
+                                </h3>
+                                <p className="text-gray-600 dark:text-gray-300 transition-colors duration-200">
+                                    {isSendingEmail
+                                        ? 'Your travel plan is being sent to your email.'
+                                        : 'Our AI is analyzing destinations, costs, and creating your personalized itinerary...'}
+                                </p>
                             </div>
                         )}
 
-                        {/* Error State */}
-                        {error && (
+                        {(error || isEmailError) && (
                             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-6 text-center transition-colors duration-200">
                                 <div className="w-12 h-12 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
                                 </div>
                                 <h3 className="text-lg font-semibold text-red-900 dark:text-red-300 mb-2 transition-colors duration-200">Something went wrong</h3>
                                 <p className="text-red-700 dark:text-red-400 transition-colors duration-200">
-                                    {typeof error === 'object' && 'data' in error
-                                        ? String(error.data)
-                                        : 'We couldn\'t generate your travel plan. Please try again.'
+                                    {isEmailError ? 'Failed to send email. Please try again.' :
+                                        (error && typeof error === 'object' && 'data' in error
+                                            ? String((error as ApiError).data)
+                                            : 'We couldn\'t generate your travel plan. Please try again.')
                                     }
                                 </p>
                                 <button
-                                    onClick={() => setQuestion('')}
+                                    onClick={handleReset}
                                     className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white rounded-lg transition-colors duration-200"
                                 >
                                     Try Again
+                                </button>
+                            </div>
+                        )}
+
+                        {isEmailSent && !data && (
+                            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl p-6 text-center transition-colors duration-200">
+                                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/40 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Mail className="w-6 h-6 text-green-600 dark:text-green-400" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-green-900 dark:text-green-300 mb-2 transition-colors duration-200">Email Sent!</h3>
+                                <p className="text-green-700 dark:text-green-400 transition-colors duration-200">
+                                    Your travel plan has been sent to your email address.
+                                </p>
+                                <button
+                                    onClick={handleReset}
+                                    className="mt-4 px-4 py-2 bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white rounded-lg transition-colors duration-200"
+                                >
+                                    Create Another Plan
                                 </button>
                             </div>
                         )}
@@ -1191,25 +1240,18 @@ const TravelPlannerHome: React.FC = () => {
 
 export default TravelPlannerHome;
 
+
 -- ./src/services/api/api_client.ts --
 
 
 
 -- ./src/services/api/travel/travelApi.ts --
 // src/services/api/travel/travelApi.ts
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { createApi, fetchBaseQuery, type FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
 import { ApiConstants } from "../../../utils/constants/api_constants";
+import { travelResponseSchema, type TravelQuery, type TravelResponse } from "../../../utils/validation/schema";
 
-// Inline types for now - you can move these to a separate types file
-export interface TravelQuery {
-    question: string;
-}
-
-export interface TravelResponse {
-    answer: string;
-}
-
-// Travel API definition with basic validation
+// Travel API definition with Zod validation
 export const travelApi = createApi({
     reducerPath: "travelApi",
     baseQuery: fetchBaseQuery({
@@ -1238,19 +1280,30 @@ export const travelApi = createApi({
                     }),
                 };
             },
-            transformResponse: (response: any): TravelResponse => {
-                // Basic response validation
-                if (!response || typeof response.answer !== 'string') {
-                    throw new Error('Invalid response from server');
+            transformResponse: (response: TravelResponse): TravelResponse => {
+                // Validate the response with Zod
+                const validation = travelResponseSchema.safeParse(response);
+                if (!validation.success) {
+                    console.error("API Response Validation Error:", validation.error.flatten());
+                    throw new Error('Invalid response structure from server');
                 }
-                return response;
+                return validation.data;
             },
-            transformErrorResponse: (response: any) => {
+            transformErrorResponse: (response: FetchBaseQueryError) => { // Use FetchBaseQueryError type
                 console.error('Travel API Error:', response);
 
+                // Access status and data based on FetchBaseQueryError structure
+                const status = 'status' in response ? response.status : 'UNKNOWN_STATUS';
+                const data = 'data' in response ? response.data : 'An unexpected error occurred';
+
+                const errorMessage = typeof data === 'string'
+                    ? data
+                    : 'An unexpected error occurred';
+
+
                 return {
-                    status: response.status || 'UNKNOWN_ERROR',
-                    data: response.data || 'An unexpected error occurred'
+                    status: status,
+                    data: errorMessage
                 };
             },
             invalidatesTags: ['TravelPlan'],
@@ -1260,4 +1313,46 @@ export const travelApi = createApi({
 
 // Export the hook
 export const { useGetTravelPlanMutation } = travelApi;
+
+
+-- ./src/services/api/email/emailApi.ts --
+// src/services/api/email/emailApi.ts
+import { createApi, fetchBaseQuery, type FetchBaseQueryError } from "@reduxjs/toolkit/query/react";
+import { ApiConstants } from "../../../utils/constants/api_constants";
+import { sendEmailSchema, type SendEmail } from "../../../utils/validation/schema";
+
+export const emailApi = createApi({
+    reducerPath: "emailApi",
+    baseQuery: fetchBaseQuery({
+        baseUrl: ApiConstants.TRAVEL_API_BASE_URL, // Assuming the same base URL for email
+        prepareHeaders: (headers) => {
+            headers.set('ngrok-skip-browser-warning', 'true');
+            headers.set('Content-Type', 'application/json');
+            return headers;
+        },
+    }),
+    tagTypes: ['Email'],
+    endpoints: (builder) => ({
+        sendEmail: builder.mutation<{ message: string }, SendEmail>({
+            query: (emailData) => ({
+                url: ApiConstants.SEND_EMAIL_ENDPOINT,
+                method: "POST",
+                body: emailData,
+            }),
+            transformErrorResponse: (response: FetchBaseQueryError) => {
+                console.error('Email API Error:', response);
+                const status = 'status' in response ? response.status : 'UNKNOWN_STATUS';
+                const data = 'data' in response ? response.data : 'An unexpected error occurred';
+                const errorMessage = typeof data === 'string' ? data : 'An unexpected error occurred';
+                return {
+                    status: status,
+                    data: errorMessage
+                };
+            },
+        }),
+    }),
+});
+
+export const { useSendEmailMutation } = emailApi;
+
 
