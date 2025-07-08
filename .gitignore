@@ -14,3 +14,9 @@ wheels/
 
 #.mypycache
 .mypy_cache
+
+#text
+combined_src_files.txt
+
+test.py
+context.py
